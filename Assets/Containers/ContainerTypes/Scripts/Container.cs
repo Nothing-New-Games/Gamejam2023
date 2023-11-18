@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.VisualScripting;
 using UnityEngine;
-using WatchDog;
 
 public class Container : MonoBehaviour
 {
@@ -32,7 +31,8 @@ public class Container : MonoBehaviour
         _Slots = GetComponentsInChildren<SlotHandler>().ToList();
         if (_Slots.Count < ContainedItems.Count)
         {
-            Watchdog.LogWarningCallback.Invoke(new(new EventMessage($"Unable to add all the loot to {ContainerOwner.name}'s {name}, as it is missing the required number of slots!")));
+            //Watchdog.LogWarningCallback.Invoke(new(new EventMessage($"Unable to add all the loot to {ContainerOwner.name}'s {name}, as it is missing the required number of slots!")));
+            Debug.LogWarning($"Unable to add all the loot to {ContainerOwner.name}'s {name}, as it is missing the required number of slots!");
             gameObject.SetActive(false);
             return;
         }
@@ -91,7 +91,8 @@ public class Container : MonoBehaviour
     {
         if (ContainerOwner != Player.GetPlayerInstance)
         {
-            Watchdog.LogWarningCallback.Invoke(new(new EventMessage("Unable to destroy player!")));
+            //Watchdog.LogWarningCallback.Invoke(new(new EventMessage("Unable to destroy player!")));
+            Debug.LogWarning("Unable to destroy player!");
             return;
         }
 

@@ -7,15 +7,21 @@ public class BasicNearDestination : Transition
 {
     public BasicNearDestination(State nextState) : base(nextState)
     {
+        _NextState = nextState;
     }
 
-    protected override bool CheckCondition()
+    public override bool CheckCondition(ref StateData passedData)
     {
-        throw new NotImplementedException();
-    }
+        BasicMovementData data = (BasicMovementData)passedData;
+        bool closeEnough = Vector3.Distance(data.ActorTransform.position, data.CurrentDestination) < data.MinDistToDest;
 
-    protected override void SetConditionMetResponse(Action onConditionMet)
-    {
-        throw new NotImplementedException();
+        if (closeEnough)
+        {
+            data.CurrentDestination = new();
+            data.ActorTransform.GetComponent<Rigidbody>().velocity = new();
+            passedData = data;
+        }
+
+        return closeEnough;
     }
 }

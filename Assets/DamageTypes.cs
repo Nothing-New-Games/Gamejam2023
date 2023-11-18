@@ -3,6 +3,8 @@ using System.Linq;
 
 public enum DamageTypes
 {
+    TrueDamage,
+
     #region Elements
     Fire, Ice, Water, Earthen, Lightning, Air, 
     #endregion

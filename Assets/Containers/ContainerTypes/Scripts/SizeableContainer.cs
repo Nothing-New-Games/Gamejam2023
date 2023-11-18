@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.VisualScripting;
 using UnityEngine;
-using WatchDog;
 
 public class SizeableContainer : Container
 {
@@ -20,15 +19,17 @@ public class SizeableContainer : Container
         if (_Slots.Count + additionalSlots < MaxSlots)
             _ContainerSize += additionalSlots;
 
-        else 
-            Watchdog.CriticalErrorCallback.Invoke(new(new EventMessage($"Unable to add {additionalSlots} slots to {gameObject.name}!")));
+        else
+            //Watchdog.CriticalErrorCallback.Invoke(new(new EventMessage($"Unable to add {additionalSlots} slots to {gameObject.name}!")));
+            Debug.LogError($"Unable to add {additionalSlots} slots to {gameObject.name}!");
     }
     public void DecreaseSize(int slotsToRemove)
     {
         if (0 < _Slots.Count - slotsToRemove)
             _ContainerSize -= slotsToRemove;
-        else 
-            Watchdog.CriticalErrorCallback.Invoke(new(new EventMessage($"Unable to remove {slotsToRemove} slots from {gameObject.name}!")));
+        else
+            //Watchdog.CriticalErrorCallback.Invoke(new(new EventMessage($"Unable to remove {slotsToRemove} slots from {gameObject.name}!")));
+            Debug.LogError($"Unable to remove {slotsToRemove} slots from {gameObject.name}!");
     }
 
 

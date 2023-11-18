@@ -1,151 +1,31 @@
 using Sirenix.OdinInspector;
 using Sirenix.Serialization;
-using System;
 using System.Collections.Generic;
-using Unity.VisualScripting;
-using UnityEditor.Search;
 using UnityEngine;
-
-#region Chaos
-//public abstract class StateMachine : MonoBehaviour
-//{
-//    /// <summary>
-//    /// The current state being used by the state machine.
-//    /// </summary>
-//    private State _CurrentState;
-//    /// <summary>
-//    /// Calls the update method of the current state.
-//    /// </summary>
-//    private void Update() => _CurrentState?.Update();
-
-//    /// <summary>
-//    /// Exits from the current state, if there is one, and sets the current state to the new state, then calls the current states enter method.
-//    /// </summary>
-//    /// <param name="newState"></param>
-//    private void SetState(State newState)
-//    {
-//        _CurrentState?.Exit();
-//        _CurrentState = newState;
-//        _CurrentState.Enter();
-//    }
-
-//    /// <summary>
-//    /// Initializes the state machine and sets the current state to the initial state.
-//    /// </summary>
-//    /// <param name="initialState">The state the machine will start with.</param>
-//    /// <param name="states">A dictionary of states and states it can switch to along with the transition to exit that state.</param>
-//    protected void Init(State initialState, Dictionary<State, Dictionary<StateTransition, State>> states)
-//    {
-//        foreach (var state in states)
-//        {
-//            foreach (var transition in state.Value)
-//            {
-//                transition.Key.Callback = () => SetState(transition.Value);
-//                state.Key.AddTransition(transition.Key);
-//            }
-//        }
-
-//        SetState(initialState);
-//    }
-//}
-//public abstract class State
-//{
-//    /// <summary>
-//    /// List of all transitions belonging to this state.
-//    /// </summary>
-//    private List<StateTransition> _Transitions = new();
-
-//    /// <summary>
-//    /// Assigsn the transition to the state.
-//    /// </summary>
-//    public void AddTransition(StateTransition transition) => _Transitions.Add(transition);
-
-//    /// <summary>
-//    /// State Enter Method. Calls the enter for all state transitions.
-//    /// </summary>
-//    public virtual void Enter()
-//    {
-//        foreach (var transition in _Transitions)
-//            transition.Enter();
-//    }
-
-//    /// <summary>
-//    /// State Exit Method. Calls the exit for all state transitions.
-//    /// </summary>
-//    public virtual void Exit()
-//    {
-//        foreach (var transition in _Transitions)
-//            transition.Exit();
-//    }
-
-//    /// <summary>
-//    /// State Update Method.
-//    /// <para>Calls the update for all state transitions under it.</para>
-//    /// </summary>
-//    public virtual void Update()
-//    {
-//        foreach (var transition in _Transitions)
-//            transition.Update();
-//    }
-//}
-//public abstract class StateTransition
-//{
-//    /// <summary>
-//    /// The callback for when the transition can exit.
-//    /// </summary>
-//    public Action Callback { get; set; }
-
-//    /// <summary>
-//    /// Checks the condition to determine if we can exit the state.
-//    /// </summary>
-//    /// <returns>
-//    /// <see langword="true"/> if we can exit.
-//    /// <para><see langword="false"/> if we cannot exit.</para>
-//    /// </returns>
-//    public abstract bool CheckCondition();
-
-//    /// <summary>
-//    /// State Transition Enter
-//    /// </summary>
-//    public virtual void Enter() { }
-
-//    /// <summary>
-//    /// State Transition Exit
-//    /// </summary>
-//    public virtual void Exit() { }
-
-//    /// <summary>
-//    /// State Transition Update method
-//    /// </summary>
-//    public virtual void Update() { }
-//}
-#endregion
 
 /// <summary>
 /// OnEnterCurrentState, OnLeaveCurrentState, Update, OnStateAwake
 /// </summary>
 public class StateManager
 {
-    public StateManager(State initialState, GameObject parent)
+    public StateData Data;
+    public StateManager(string startingTransition, StateData data)
     {
-        foreach (var state in PossibleStates)
-        {
-            state.Initialize(parent);
-        }
-
-        _CurrentState = initialState;
+        Data = data;
+        _CurrentState = Data.GetTransition(startingTransition).RetrieveNextState();
     }
 
-    private State _CurrentState;
+    public string CurrentStateName => _CurrentState.ToString();
 
-    [Searchable, TabGroup("Customization"), ShowInInspector, OdinSerialize]
-    public List<State> PossibleStates = new List<State>();
+    private State _CurrentState { get; set; }
+    public bool IsStateEmpty => _CurrentState == null;
 
-    public virtual void OnStartCurrentState() => _CurrentState?.OnEnterState();
-    public virtual void OnLeaveCurrentState() => _CurrentState?.OnLeaveState();
-    public void Update() => _CurrentState?.OnUpdateState();
-    public void LateUpdate() => _CurrentState?.OnLateUpdateState();
-    public virtual void OnStateAwake() => _CurrentState?.OnStateAwake();
+
+    public void  OnStartCurrentState() => _CurrentState = _CurrentState?.OnEnterState(ref Data);
+    public void OnLeaveCurrentState() => _CurrentState = _CurrentState?.OnLeaveState(ref Data);
+    public void OnUpdate() => _CurrentState = _CurrentState?.OnUpdateState(ref Data);
+    public void OnLateUpdate() => _CurrentState = _CurrentState?.OnLateUpdateState(ref Data);
+    public void OnStateAwake() => _CurrentState = _CurrentState?.OnStateAwake(ref Data);
 }
 
 /// <summary>
@@ -153,33 +33,44 @@ public class StateManager
 /// </summary>
 public abstract class State
 {
-    public State(Dictionary<State, Transition> possibleTransitions) { }
-
-    protected Dictionary<State, Transition> _PossibleTransitions;
-    protected GameObject _Parent;
-    public void SetParent(GameObject parent)
+    public virtual State OnEnterState(ref StateData data) { return this; }
+    public virtual State OnLeaveState(ref StateData data) { return this; }
+    public virtual State OnLateUpdateState(ref StateData data)
     {
-        if (_Parent == null)
-            _Parent = parent;
-    }
+        foreach (var collection in data.GetTransitions)
+        {
+            if (collection.Value.CheckCondition(ref data))
+            {
+                return collection.Value.RetrieveNextState();
+            }
+        }
 
-    public abstract void Initialize(GameObject parent);
-    public virtual void OnEnterState() { }
-    public virtual void OnLeaveState() { }
-    public virtual void OnUpdateState() { }
-    public virtual void OnLateUpdateState() { }
-    public virtual void OnStateAwake() { }
+        return this;
+    }
+    public virtual State OnUpdateState(ref StateData data) { return this; }
+    public virtual State OnStateAwake(ref StateData data) { return this; }
 }
 
 public abstract class Transition
 {
     public Transition(State nextState) => _NextState = nextState;
 
-    private Action OnConditionMet;
+    protected State _NextState;
 
-    private State _NextState;
+    public abstract bool CheckCondition(ref StateData passedData);
 
-    protected abstract void SetConditionMetResponse(Action onConditionMet);
+    public State RetrieveNextState() => _NextState;
+}
 
-    public abstract bool CheckCondition();
+public class StateData
+{
+    public Transform ActorTransform;
+    public StateData(Transform actorTransform) => ActorTransform = actorTransform;
+
+    
+    private Dictionary<string, Transition> _AllTransitions;
+    public Dictionary<string, Transition> GetTransitions => _AllTransitions;
+
+    public Dictionary<string, Transition> SetTransitions { set { if (_AllTransitions == null) _AllTransitions = value; } }
+    public Transition GetTransition(string transitionName) => _AllTransitions[transitionName];
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 public class BasicIdledForDuration : Transition
 {
@@ -10,13 +11,24 @@ public class BasicIdledForDuration : Transition
 
     }
 
-    protected override bool CheckCondition()
+    public override bool CheckCondition(ref StateData passedData)
     {
-        throw new NotImplementedException();
-    }
+        BasicMovementData data = (BasicMovementData)passedData;
 
-    protected override void SetConditionMetResponse(Action onConditionMet)
-    {
-        throw new NotImplementedException();
+        if (!Player.IsGamePaused)
+            data.CurrentIdleTime += Time.deltaTime;
+
+        if (data.CurrentIdleTime >= data.ChosenIdleTime)
+        {
+            data.ChosenIdleTime = Random.Range(data.MinIdleDuration, data.MaxIdleDuration);
+            data.CurrentIdleTime = 0f;
+
+            if (data.IsFollowingPath && _NextState.ToString() == "BasicFollowPath")
+                return true;
+            else if (!data.IsFollowingPath && _NextState.ToString() == "BasicWandering")
+                return true;
+        }
+
+        return false;
     }
 }

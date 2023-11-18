@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class BasicIdle : State
-{
-    public override void Initialize()
-    {
-        throw new System.NotImplementedException();
-    }
+{   
+    public override State OnUpdateState(ref StateData passedData) => OnLateUpdateState(ref passedData);
 }

@@ -1,4 +1,5 @@
 using Sirenix.OdinInspector;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -92,13 +93,14 @@ public class CameraTargetTracking : MonoBehaviour
         _targetDirection = target.position - transform.position;
         _desiredRotation = Quaternion.LookRotation(_targetDirection);
         _currentRotation = transform.rotation;
-        transform.rotation = 
+        transform.rotation =
             Quaternion.RotateTowards
             (
                 transform.rotation,
-                _desiredRotation, 
-                _rotationStrength * rotationSpeed * Time.deltaTime
+                _desiredRotation,
+                _rotationStrength * rotationSpeed * Time.fixedDeltaTime
             );
+        //transform.rotation = Quaternion.Lerp(transform.rotation, _desiredRotation, Time.fixedDeltaTime * rotationSpeed);
 
         _currentDist = Vector3.Distance(gameObject.transform.position, target.position + offset);
         if (_movementStrength > minStrength)
@@ -110,7 +112,7 @@ public class CameraTargetTracking : MonoBehaviour
                 (
                     transform.position,
                     _destination,
-                    _movementStrength * movementRate * Time.deltaTime
+                    _movementStrength * movementRate * Time.fixedDeltaTime
                 );
         }
 
@@ -169,13 +171,13 @@ public class CameraTargetTracking : MonoBehaviour
     private void CalculateStrength()
     {
         //Sets the strength for the camera movement speed based on the distance to it's target.
-        _movementStrength = Mathf.Clamp(
+        _movementStrength = (float)Math.Round(Mathf.Clamp(
                         _currentDist / maxDistanceToTarget,
-                        0, 1);
+                        0, 1), 1);
         //Sets the strength for the speed the camera rotates based on the distance it has to rotate to face it's target.
-        _rotationStrength = Mathf.Clamp(
+        _rotationStrength = (float)Math.Round(Mathf.Clamp(
                         Quaternion.Angle(_currentRotation, _desiredRotation),
-                        0, 1);
+                        0, 1), 1);
 
         #region Debug Calculations
         //Color codes the Gizmo to represent the values the camera is using to determine how it moves.

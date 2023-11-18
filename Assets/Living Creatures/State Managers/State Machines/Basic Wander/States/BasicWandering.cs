@@ -1,72 +1,66 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public class BasicWandering : State
 {
-    public BasicWandering(Dictionary<State, Transition> possibleTransitions, bool MustWanderFromSpawn, float maxWanderDist) : base(possibleTransitions)
+    public override State OnUpdateState(ref StateData passedData)
     {
-        _PossibleTransitions = possibleTransitions;
-        _CanOnlyWanderFromSpawnPoint = MustWanderFromSpawn;
-        _MaxWanderDistance = maxWanderDist;
-        _Rigidbody = _Parent.GetComponent<Rigidbody>();
-    }
+        BasicMovementData data = passedData as BasicMovementData;
 
-    GameObject _Parent;
-    Vector3 _SpawnPosition;
-    float _MaxWanderDistance;
-    /// <summary>
-    /// If false, the current position of the creature will be used instead.
-    /// </summary>
-    bool _CanOnlyWanderFromSpawnPoint;
-    Rigidbody _Rigidbody;
-
-    Vector3 _CurrentDestination = new();
-
-    public override void OnUpdateState()
-    {
         //Check if we have a destination
-        if (_CurrentDestination == new Vector3())
+        if (data.CurrentDestination == new Vector3())
         {
             //If not, check if we can wander from the only from the spawn point,
-            if (!_CanOnlyWanderFromSpawnPoint)
+            if (data.IsFreeRoaming)
             {
-                //Then choose a destination within the wander distance of there.
-                _CurrentDestination =
-                    new Vector3(Random.Range(-_MaxWanderDistance, _MaxWanderDistance), 0, Random.Range(-_MaxWanderDistance, _MaxWanderDistance))
+                //Choose a destination from our current position.
+                data.CurrentDestination = new Vector3(UnityEngine.Random.Range(-data.MaxWanderDist, data.MaxWanderDist), 0, UnityEngine.Random.Range(-data.MaxWanderDist, data.MaxWanderDist))
                     +
-                    _SpawnPosition;
+                    data.ActorTransform.position;
             }
             else
             {
-                //Choose a destination from our current position.
-                _CurrentDestination =
-                    new Vector3(Random.Range(-_MaxWanderDistance, _MaxWanderDistance), 0, Random.Range(-_MaxWanderDistance, _MaxWanderDistance))
+                //Then choose a destination within the wander distance of there.
+                data.CurrentDestination =
+                    new Vector3(UnityEngine.Random.Range(-data.MaxWanderDist, data.MaxWanderDist), 0, UnityEngine.Random.Range(-data.MaxWanderDist, data.MaxWanderDist))
                     +
-                    _Parent.transform.position;
+                    data.SpawnPoint;
             }
+
+            //Raycast to determine if there are any obstacles in the way.
+            RaycastHit hit;
+            //Adjust the current position to the nearest point before the obstacle.
+            Physics.Raycast(new Ray(data.ActorTransform.position, data.CurrentDestination - data.ActorTransform.position), out hit, Vector3.Distance(data.ActorTransform.position, data.CurrentDestination));
+            if (hit.transform != null)
+                data.CurrentDestination = hit.transform.position - (data.MinDistToDest * data.ActorTransform.position);
         }
 
         //Use the rigid body component to move to the desired destination.
-        _Rigidbody.MovePosition(_CurrentDestination);
-
-        //Loop through all transitions
-        foreach (var transition in _PossibleTransitions)
+        if (!Player.IsGamePaused)
         {
-            //Check if any conditions are met.
-            if (transition.Value.CheckCondition())
-            {
-                //Set the new condition to the key
-            }
+            //Rotate
+            Quaternion targetRotation = Quaternion.LookRotation(data.CurrentDestination - data.ActorTransform.position);
+            data.ActorTransform.rotation = Quaternion.Slerp(data.ActorTransform.rotation, targetRotation, data.RotationSpeed * Time.deltaTime);
+
+            //Capture the rigidbody
+            Rigidbody rb = data.ActorTransform.GetComponent<Rigidbody>();
+
+            //Move Towards
+            rb.velocity =
+                (data.CurrentDestination - data.ActorTransform.position + data.ActorTransform.forward * Time.fixedDeltaTime).normalized * data.MovementSpeed;
+                //.AddForce(data.CurrentDestination - data.ActorTransform.position * data.MovementSpeed * Time.fixedDeltaTime);
         }
-    }
 
-    public override void Initialize(GameObject parent)
-    {
-        _Parent = parent;
-        _SpawnPosition = parent.transform.position;
-    }
+        //Convert the data back so that we may pass it to the returned state.
+        passedData = data;
 
+        //Get the next state and pass the data along.
+        return OnLateUpdateState(ref passedData);
+    }
     
     //Needs to know how far they can wander.
     //Needs to have a distance it can be from the destination.

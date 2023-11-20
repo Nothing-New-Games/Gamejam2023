@@ -20,12 +20,12 @@ public class BasicIdledForDuration : Transition
 
         if (data.CurrentIdleTime >= data.ChosenIdleTime)
         {
-            data.ChosenIdleTime = Random.Range(data.MinIdleDuration, data.MaxIdleDuration);
+            data.ChosenIdleTime = Random.Range(data.Actor.MinIdleDuration, data.Actor.MovementForceMultiplier);
             data.CurrentIdleTime = 0f;
 
-            if (data.IsFollowingPath && _NextState.ToString() == "BasicFollowPath")
+            if (data.Actor.IsFollowingPath && _NextState.ToString() == "BasicFollowPath")
                 return true;
-            else if (!data.IsFollowingPath && _NextState.ToString() == "BasicWandering")
+            else if (!data.Actor.IsFollowingPath && _NextState.ToString() == "BasicWandering")
                 return true;
         }
 

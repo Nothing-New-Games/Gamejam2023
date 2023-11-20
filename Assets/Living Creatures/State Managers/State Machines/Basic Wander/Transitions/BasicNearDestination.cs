@@ -13,7 +13,7 @@ public class BasicNearDestination : Transition
     public override bool CheckCondition(ref StateData passedData)
     {
         BasicMovementData data = (BasicMovementData)passedData;
-        bool closeEnough = Vector3.Distance(data.ActorTransform.position, data.CurrentDestination) < data.MinDistToDest;
+        bool closeEnough = Vector3.Distance(data.ActorTransform.position, data.CurrentDestination) < data.Actor.MinDistToDest;
 
         if (closeEnough)
         {

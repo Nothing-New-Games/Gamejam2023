@@ -1,4 +1,5 @@
 using Sirenix.OdinInspector;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -9,6 +10,7 @@ using WatchDog;
 public class Player : Creature, IAttackable
 {
     private static Player PlayerInstance;
+    private static PlayerCamera _Camera;
     public static Player? GetPlayerInstance
     {
         get
@@ -42,7 +44,7 @@ public class Player : Creature, IAttackable
 
     [ShowInInspector, TabGroup("Main/Customization/SubTabs", "Pickup"), MinValue(0)]
     [Tooltip("The amount of force that will be applied to the player when they jump.")]
-    public Vector3 PickupOffset = new ();
+    public float PickupOffset = 0f;
 
     [TabGroup("Main", "Debug"), ReadOnly, DisplayAsString]
     public bool IsGrounded { get; private set; } = false;
@@ -80,6 +82,7 @@ public class Player : Creature, IAttackable
         }
 
         ActorTransform = transform;
+        _Camera = GetComponentInChildren<PlayerCamera>();
         
         _StateManager = new("Idle", new PlayerStateData(transform)
         {
@@ -94,6 +97,9 @@ public class Player : Creature, IAttackable
         HoldItemButtonClicked += OnPickupButtonClicked;
         HoldItemButtonReleased += OnPickupButtonReleased;
 
+        HoldItemButtonClicked += IPickupAble.OnInteractionChange;
+        HoldItemButtonReleased += IPickupAble.OnInteractionChange;
+
         await Task.Yield();
     }
 
@@ -106,35 +112,33 @@ public class Player : Creature, IAttackable
 
         _currentTarget = ClosestAndInFrontTargetable();
 
-        if (_currentTarget != null)
+        try
         {
-            Physics.Raycast(transform.position, _currentTarget.ActorTransform.position - transform.position, out hit);
-
-            if (hit.transform.gameObject != _currentTarget.ActorTransform.gameObject)
+            if (_currentTarget != null)
             {
-                Debug.Log($"{hit.transform.name} is in the way of {_currentTarget.ActorTransform.name}!");
-                _currentTarget = null;
+                Physics.Raycast(transform.position, _currentTarget.ActorTransform.position - transform.position, out hit);
+
+                if (hit.transform.gameObject != _currentTarget.ActorTransform.gameObject)
+                {
+                    Debug.Log($"{hit.transform.name} is in the way of {_currentTarget.ActorTransform.name}!");
+                    _currentTarget = null;
+                }
             }
+        }
+        catch(Exception ex)
+        {
+            Debug.LogWarning($"Unknown exception when handling pickup movement!\n{ex.Message}");
         }
 
         //Debug.Log(_currentTarget);
 
         if (_currentTarget != null )
         {
-            if (Input.GetKeyDown(KeyCode.Mouse0) && _currentTarget.GetType() == typeof(IPickupAble))
-                HoldItemButtonClicked.Invoke(new());
+            if (Input.GetKey(KeyCode.Mouse0) && _currentTarget as IPickupAble != null)
+                HoldItemButtonClicked.Invoke(new(_currentTarget as IPickupAble, _Camera.transform.forward * PickupOffset + transform.position));
         }
         if (Input.GetKeyUp(KeyCode.Mouse0))
-            HoldItemButtonReleased.Invoke(new());
-
-        if (HoldItemInfront && _currentTarget != null)
-        {
-            if (_currentTarget.GetType() == typeof(IPickupAble))
-            {
-                _currentTarget.ActorTransform.position = transform.forward + PickupOffset;
-            }
-            else HoldItemInfront = false;
-        }
+            HoldItemButtonReleased.Invoke(new(_currentTarget as IPickupAble, new Vector3()));
 
         await Task.Yield();
     }

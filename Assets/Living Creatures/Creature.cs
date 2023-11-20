@@ -32,13 +32,18 @@ public class Creature : SerializedMonoBehaviour, IAttackable
     /// </summary>
     protected int _maxHealth;
 
-    [ShowInInspector, TabGroup("Main",  "Debug"), DisplayAsString]
+    [ShowInInspector, TabGroup("Main",  "Debug"), DisplayAsString, OdinSerialize]
     [Tooltip("The target the creature currently has. Can be changed during playtime in the editor. Variable is protected, so changes will not stick.")]
-    protected ITargetable _currentTarget { get; set; }
+    public ITargetable _currentTarget { get; set; }
     [ShowInInspector, TabGroup("Main",  "Protected"), Sirenix.OdinInspector.ReadOnly]
     [Tooltip("A list of all living creatures to this one. Auto populates and is determined by MaxTargetingDistance.")]
     protected List<Creature> NearbyLiving { get; private set; } = new();
 
+    [ShowInInspector, ReadOnly, DisplayAsString, TabGroup("Main", "Debug")]
+    [Tooltip("Stops the Update and LateUpdate from being called on the state manager.")]
+    protected bool TemporaryCeaseStateFire = false;
+
+    protected Rigidbody _RB;
 
     protected StateManager _StateManager;
     public StateManager GetStateManager => _StateManager;
@@ -58,8 +63,8 @@ public class Creature : SerializedMonoBehaviour, IAttackable
     #region Customization
 
     #region Targetting
-    [ShowInInspector, TabGroup("Main", "Customization"), ListDrawerSettings(AddCopiesLastElement = true)]
-    public List<ITargetable> TargetableCreatures = new();
+    //[ShowInInspector, TabGroup("Main", "Customization"), ListDrawerSettings(AddCopiesLastElement = true)]
+    //public List<ITargetable> TargetableCreatures = new();
     [TabGroup("Main", "Customization")]
     public bool IsPlayer = false;
     #endregion
@@ -71,12 +76,15 @@ public class Creature : SerializedMonoBehaviour, IAttackable
     [Tooltip("The Line of Sight angle representing how wide the living creature can see infront of them.")]
     public int LOSDegree = 40;
     [TabGroup("Main/Customization/SubTabs", "Sight"), Range(1, 99), MinValue(1), MaxValue(99), OnValueChanged("OnDetectionWeightChange")]
+    [ShowIf("@IsPlayer == false")]
     [Tooltip("Percentage for how likely a living creature can detect things when looking towards them.\nThis + Distance will always = 100")]
     public int AngleDetectionWeight = 75;
     [TabGroup("Main/Customization/SubTabs", "Sight"), Range(1, 99), MinValue(1), MaxValue(99), OnValueChanged("OnDetectionWeightChange")]
+    [ShowIf("@IsPlayer == false")]
     [Tooltip("Percentage for how likely a living creature can detect things when closer to them.\nThis + Angle will always = 100")]
     public int DistanceDetectionWeight = 25;
     [TabGroup("Main/Customization/SubTabs", "Sight"), Range(0, 100), MinValue(0), MaxValue(100)]
+    [ShowIf("@IsPlayer == false")]
     [Tooltip("This gives makes it harder for the creature to find a target, when normally they would have succeeded.")]
     public int DetectionFailureChance = 0;
     #endregion
@@ -87,36 +95,36 @@ public class Creature : SerializedMonoBehaviour, IAttackable
     [ShowInInspector, TabGroup("Main/Customization/SubTabs", "Movement"), MinValue(0)]
     [Tooltip("The speed at which the creature can move through the world.")]
     public float MovementForceMultiplier = 10f;
-    [ShowInInspector, TabGroup("Main/Customization/SubTabs", "Movement"), MinValue(0)]
+    [ShowInInspector, TabGroup("Main/Customization/SubTabs", "Movement"), MinValue(0), ShowIf("@IsPlayer == false")]
     [Tooltip("The speed at which the creature can turn its body.")]
     public float RotationSpeed = 10f;
 
-    [TabGroup("Main/Customization/SubTabs", "Movement"), MinValue(0), ShowIf("@FollowsRoute == false && IsPlayer == false")]
+    [TabGroup("Main/Customization/SubTabs", "Movement"), MinValue(0), ShowIf("@IsFollowingPath == false && IsPlayer == false")]
     [Tooltip("Sets the max distance the creature can wander from its wander point. Only works in edit mode.")]
     public float MaxWanderDist = 10f;
     [TabGroup("Main/Customization/SubTabs", "Movement"), MinValue(0), ShowIf("@IsPlayer == false")]
     [Tooltip("Sets the min distance the creature will be before considerd \"at\" the destination. Only works in edit mode.")]
     public float MinDistToDest = 0.1f;
-    [TabGroup("Main/Customization/SubTabs", "Movement"), MinValue(0), ShowIf("@FollowsRoute == false && IsPlayer == false")]
+    [TabGroup("Main/Customization/SubTabs", "Movement"), MinValue(0), ShowIf("@IsFollowingPath == false && IsPlayer == false")]
     [Tooltip("Sets the min duration the creature can idle for. Only works in edit mode.")]
     public float MinIdleDuration = 1f;
-    [TabGroup("Main/Customization/SubTabs", "Movement"), MinValue(0), ShowIf("@FollowsRoute == false && IsPlayer == false")]
+    [TabGroup("Main/Customization/SubTabs", "Movement"), MinValue(0), ShowIf("@IsFollowingPath == false && IsPlayer == false")]
     [Tooltip("Sets the max duration the creature can idle for. Only works in edit mode.")]
     public float MaxIdleDuration = 10f;
 
 
-    [TabGroup("Main/Customization/SubTabs", "Movement"), ShowIf("@FollowsRoute && IsPlayer == false"), ShowInInspector, OdinSerialize]
+    [TabGroup("Main/Customization/SubTabs", "Movement"), ShowIf("@IsFollowingPath && IsPlayer == false"), ShowInInspector, OdinSerialize]
     [Tooltip("A list of points the creature will move to."), ListDrawerSettings(AddCopiesLastElement = true)]
     public List<CreaturePathPoint> PathPoints = new();
 
     [Title("Toggles")]
-    [TabGroup("Main/Customization/SubTabs", "Movement"), ShowIf("@FollowsRoute == false && IsPlayer == false")]
+    [TabGroup("Main/Customization/SubTabs", "Movement"), ShowIf("@IsFollowingPath == false && IsPlayer == false")]
     [Tooltip("If true, the creature will choose a destination from its current position. If false, the creature will wander from its spawn point.")]
     public bool IsFreeRoaming = false;
 
     [TabGroup("Main/Customization/SubTabs", "Movement"), ShowIf("@IsPlayer == false")]
     [Tooltip("If true, the creature will follow a specific route instead of random points.")]
-    public bool FollowsRoute = false;
+    public bool IsFollowingPath = false;
     #endregion
     #region Health
     [TabGroup("Main/Customization/SubTabs", "Health")]
@@ -143,10 +151,6 @@ public class Creature : SerializedMonoBehaviour, IAttackable
     protected int Level = 1;
     [MinValue(0), TabGroup("Main/Customization/SubTabs", "Stats"), OdinSerialize, ShowInInspector]
     protected int ExperienceReward = 50;
-    [MinValue(0), TabGroup("Main/Customization/SubTabs", "Stats"), OdinSerialize, ShowInInspector]
-    protected float MaxMovementSpeed = 10;
-    [MinValue(0), TabGroup("Main/Customization/SubTabs", "Stats"), OdinSerialize, ShowInInspector]
-    protected float MaxRotationSpeed = 10;
     [OnStateUpdate("CalculateAlignment"), Range(-100, 100), TabGroup("Main/Customization/SubTabs", "Stats"), OdinSerialize, ShowInInspector]
     protected int AlignmentLevel = 0;
     [ReadOnly, GUIColor("GetAlignmentColor"), TabGroup("Main/Customization/SubTabs", "Stats"), DisplayAsString, LabelText("Alignment: ")]
@@ -266,7 +270,8 @@ public class Creature : SerializedMonoBehaviour, IAttackable
     {
         await OnUpdate();
 
-        _StateManager.OnUpdate();
+        if (!TemporaryCeaseStateFire)
+            _StateManager.OnUpdate();
 
         CurrentStateAsString = GetCurrentStateAsString();
     }
@@ -289,7 +294,8 @@ public class Creature : SerializedMonoBehaviour, IAttackable
 
         await OnLateUpdate();
 
-        _StateManager.OnLateUpdate();
+        if (!TemporaryCeaseStateFire)
+            _StateManager.OnLateUpdate();
     }
     private async void Awake()
     {
@@ -306,6 +312,8 @@ public class Creature : SerializedMonoBehaviour, IAttackable
         }
         else if (_Gradient != null)
             DistanceGradient = _Gradient;
+
+        _RB = GetComponent<Rigidbody>();
 
         await OnAwake();
 
@@ -338,25 +346,25 @@ public class Creature : SerializedMonoBehaviour, IAttackable
 
     #region Gizmos
     #region Toggles
-    [FoldoutGroup("Main/Debug/Toggles", expanded: true), LabelWidth(300)]
+    [FoldoutGroup("Main/Debug/Gizmo Toggles", expanded: true), LabelWidth(300)]
     [Tooltip("If true, draws all checked gizmo debug tools for the creature.")]
     public bool DrawGizmos = false;
-    [FoldoutGroup("Main/Debug/Toggles"), LabelWidth(300)]
+    [FoldoutGroup("Main/Debug/Gizmo Toggles"), LabelWidth(300)]
     [Tooltip("Draws all cardinal directions, including up and down.")]
     public bool DrawCardinals = false;
-    [FoldoutGroup("Main/Debug/Toggles"), LabelWidth(300)]
+    [FoldoutGroup("Main/Debug/Gizmo Toggles"), LabelWidth(300)]
     [Tooltip("Draws gizmos representing custom directions based on provided values.")]
     public bool DrawCustomDirections = false;
-    [FoldoutGroup("Main/Debug/Toggles"), LabelWidth(300), OnValueChanged("ToggleNearbyGizmo"), HideIf("DrawToAllTargets")]
+    [FoldoutGroup("Main/Debug/Gizmo Toggles"), LabelWidth(300), OnValueChanged("ToggleNearbyGizmo"), HideIf("DrawToAllTargets")]
     [Tooltip("Draws a gizmo line to all targets within the MaxTargetingDistance.")]
     public bool DrawToNearbyTargets = false;
-    [FoldoutGroup("Main/Debug/Toggles"), LabelWidth(300), OnValueChanged("ToggleAllGizmo"), HideIf("DrawToNearbyTargets")]
+    [FoldoutGroup("Main/Debug/Gizmo Toggles"), LabelWidth(300), OnValueChanged("ToggleAllGizmo"), HideIf("DrawToNearbyTargets")]
     [Tooltip("Draws a gizmo line to all possible targets in the scene.")]
     public bool DrawToAllTargets = false;
-    [FoldoutGroup("Main/Debug/Toggles"), LabelWidth(300)]
+    [FoldoutGroup("Main/Debug/Gizmo Toggles"), LabelWidth(300)]
     [Tooltip("Draws gizmo lines representing what the creature counts as immediately infront of it, based on LOSDegree.")]
     public bool DrawLineOfSight = false;
-    [FoldoutGroup("Main/Debug/Toggles"), LabelWidth(300)]
+    [FoldoutGroup("Main/Debug/Gizmo Toggles"), LabelWidth(300)]
     [Tooltip("Draws a circle where each point of a set path is."), ShowIf("@IsPlayer == false")]
     public bool DrawPathPoints = false;
 
@@ -782,6 +790,10 @@ public enum DefaultEvents
 public interface ITargetable
 {
     public Transform ActorTransform { get; set; }
+    public string ToString()
+    {
+        return ActorTransform.name;
+    }
 }
 
 public interface IAttackable : ITargetable
@@ -793,7 +805,7 @@ public interface IAttackable : ITargetable
     /// </summary>
     /// <param name="attacker"></param>
     /// <param name="args"></param>
-    public abstract void Attacked(object attacker, EventArgObjects args);
+    //public abstract void Attacked(object attacker, EventArgObjects args);
 }
 
 public interface IChatty : ITargetable
@@ -803,7 +815,25 @@ public interface IChatty : ITargetable
 
 public interface IPickupAble : ITargetable
 {
+    public abstract bool isBeingHeld { get; set; }
+    public static void OnInteractionChange(object sender, EventArgObjects args)
+    {
+        try
+        {
+            IPickupAble target = args.GetArgument<IPickupAble>();
+            Vector3 newActorPosition = args.GetArgument<Vector3>();
 
+            if (target == null || newActorPosition == new Vector3())
+            {
+                target.isBeingHeld = false;
+                return;
+            }
+
+            target.isBeingHeld = true;
+            target.ActorTransform.position = args.GetArgument<Vector3>();
+        }
+        catch { } //Ignore errors cuz they probably don't matter lmao
+    }
 }
 public interface ILootable : IPickupAble
 {

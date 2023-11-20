@@ -7,13 +7,12 @@ using UnityEngine;
 
 public class Tester : Creature, IPickupAble
 {
-    public bool IsTalkable => false;
-
-    public bool IsAttackable => false;
+    public bool isBeingHeld { get; set; }
 
     [ReadOnly, LabelText("Current Destination:"), DisplayAsString, ShowInInspector]
     [TabGroup("Main", "Debug")]
     public string CurerntDestinationAsString => GetDestination();
+
     private string GetDestination()
     {
         if (_StateManager == null)
@@ -25,6 +24,7 @@ public class Tester : Creature, IPickupAble
     public override async Task OnAwake()
     {
         ActorTransform = transform;
+        //Player.HoldItemButtonClicked += OnPickup;
 
         _StateManager = new("Idle", new BasicMovementData(transform)
         {
@@ -34,35 +34,40 @@ public class Tester : Creature, IPickupAble
                 { "Wandering", new BasicIdledForDuration(new BasicWandering()) },
                 { "FollowingPath", new BasicIdledForDuration(new BasicFollowPath()) }
             },
-            MinDistToDest = MinDistToDest,
-            IsFreeRoaming = IsFreeRoaming,
-            IsFollowingPath = FollowsRoute,
             SpawnPoint = transform.position,
-            MaxWanderDist = MaxWanderDist,
             CurrentDestination = transform.position,
-            MinIdleDuration = MinIdleDuration,
-            MaxIdleDuration = MaxIdleDuration,
-            MovementSpeed = MovementForceMultiplier,
-            RotationSpeed = RotationSpeed,
-            PathPoints = PathPoints,
+            Actor = this,
         });
+
+        await Task.Yield();
+    }
+
+    public override async Task OnUpdate()
+    {
+        TemporaryCeaseStateFire = isBeingHeld;
+        if (TemporaryCeaseStateFire)
+        {
+            _RB.constraints = RigidbodyConstraints.FreezeAll;
+        }
+        else
+        {
+            _RB.constraints = RigidbodyConstraints.FreezeRotationY;
+        }
 
         await Task.Yield();
     }
 
 
 
-
-
-    [FoldoutGroup("Main/Debug/Toggles"), LabelWidth(300)]
+    [FoldoutGroup("Main/Debug/Gizmo Toggles"), LabelWidth(300)]
     [Tooltip("Draws a sphere where the destination is, with a width of the min distance to the destination.")]
     public bool DrawDestination = false;
 
-    [FoldoutGroup("Main/Debug/Toggles"), LabelWidth(300)]
+    [FoldoutGroup("Main/Debug/Gizmo Toggles"), LabelWidth(300)]
     [Tooltip("Draws a sphere where the spawn point is located.")]
     public bool DrawSpawnPoint = false;
 
-    [FoldoutGroup("Main/Debug/Toggles"), LabelWidth(300)]
+    [FoldoutGroup("Main/Debug/Gizmo Toggles"), LabelWidth(300)]
     [Tooltip("Draws a sphere to show where the creature can wander within..")]
     public bool DrawWanderZone = false;
 
@@ -78,7 +83,7 @@ public class Tester : Creature, IPickupAble
                 {
                     Gizmos.color = Color.cyan;
                         /*ColorByDistance(basicData.MinDistToDest / Vector3.Distance(transform.position, basicData.CurrentDestination));*/
-                    Gizmos.DrawWireSphere(basicData.CurrentDestination, basicData.MinDistToDest * 3);
+                    Gizmos.DrawWireSphere(basicData.CurrentDestination, MinDistToDest * 3);
                 }
                 if (DrawSpawnPoint)
                 {
@@ -90,12 +95,12 @@ public class Tester : Creature, IPickupAble
                 {
                     Gizmos.color = Color.red;
                     /*ColorByDistance(basicData.MinDistToDest / Vector3.Distance(transform.position, basicData.CurrentDestination));*/
-                    if (!basicData.IsFreeRoaming)
-                        Gizmos.DrawWireSphere(basicData.SpawnPoint, basicData.MaxWanderDist);
+                    if (!IsFreeRoaming)
+                        Gizmos.DrawWireSphere(basicData.SpawnPoint, MaxWanderDist);
                     else if (basicData.CurrentDestination != new Vector3())
-                        Gizmos.DrawWireSphere(basicData.CurrentDestination, basicData.MaxWanderDist);
+                        Gizmos.DrawWireSphere(basicData.CurrentDestination, MaxWanderDist);
                     else
-                        Gizmos.DrawWireSphere(basicData.ActorTransform.position, basicData.MaxWanderDist);
+                        Gizmos.DrawWireSphere(transform.position, MaxWanderDist);
                 }
             }
         }
